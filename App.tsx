@@ -240,7 +240,7 @@ const App: React.FC = () => {
     {/* Only visible when printing is active. CSS also ensures it's visible in print media. */}
     <div className={`print-container bg-white w-full h-auto ${isPrinting ? 'block' : 'hidden'}`}>
         {activeFile && (
-            <div className="max-w-4xl mx-auto p-12">
+            <div className="w-full px-[20mm] py-[15mm]">
                 <Preview content={activeFile.content} />
             </div>
         )}

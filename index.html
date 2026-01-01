@@ -125,7 +125,7 @@
       /* Apply these styles when printing OR when the body has the 'printing' class */
       @media print, body.printing {
         @page {
-          margin: 15mm;
+          margin: 0; /* IMPORTANT: Removes browser default headers/footers (date, title, url) */
           size: auto;
         }
 
