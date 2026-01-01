@@ -15,7 +15,7 @@ export const useFileSystem = () => {
 
   // Refs needed to access latest state inside async timeouts/callbacks
   const filesRef = useRef(files);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { filesRef.current = files; }, [files]);
 

@@ -13,5 +13,11 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+  },
+  preview: {
+    // Required for container deployments (Cloud Run, Docker, etc.)
+    host: true, // Listen on 0.0.0.0
+    port: Number(process.env.PORT) || 8080,
+    allowedHosts: true, 
   }
 });
