@@ -53,6 +53,7 @@
       "category": "public.app-category.productivity",
       "target": ["dmg", "zip"],
       "identity": null,
+      "forceCodeSigning": false,
       "icon": "assets/icon.icns"
     },
     "directories": {
