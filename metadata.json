@@ -1,0 +1,5 @@
+{
+  "name": "record_now",
+  "description": "A Typora-like elegant Markdown editor with real-time preview and auto-save capabilities, designed with macOS aesthetics.",
+  "requestFramePermissions": []
+}
