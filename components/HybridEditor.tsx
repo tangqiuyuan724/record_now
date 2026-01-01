@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -107,10 +106,6 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
       const currentBlock = blocks[index];
       
       // If we are inside a code block (starts with ```), Enter should insert newline, not split block
-      // unless we are specifically wanting to break out? 
-      // Typora behavior: standard Enter in code block adds newline. 
-      // Cmd+Enter or exiting block splits. 
-      // For now, let's keep it simple: if it detects it's a code block, allow multiline.
       if (currentBlock.content.trim().startsWith('```') && !currentBlock.content.trim().endsWith('```')) {
           // It's an open code block, allow default Enter (textarea handles it)
           return; 
@@ -170,10 +165,7 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     } 
     // NAVIGATION: Arrows
     else if (e.key === 'ArrowUp' && index > 0) {
-        // Only navigate if cursor is at start? Simplified for now.
-        // For textareas, this might conflict with internal navigation. 
-        // Ideally check cursor position.
-        if (!blocks[index].content.includes('\n')) { // Simple check to avoid jumping out of multiline blocks too easily
+        if (!blocks[index].content.includes('\n')) { 
              setFocusedBlockId(blocks[index - 1].id);
         }
     }
@@ -275,7 +267,9 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
         if (text.startsWith('## ')) return 'text-2xl font-bold pb-2 mt-3';
         if (text.startsWith('### ')) return 'text-xl font-bold pb-2 mt-2';
         if (text.startsWith('> ')) return 'italic text-gray-500 border-l-4 border-gray-300 pl-4 py-1';
-        if (text.trim().startsWith('```')) return 'font-mono text-sm bg-gray-50 p-3 rounded-lg text-gray-600 border border-gray-100 leading-relaxed';
+        // Gray background for code block raw text (Editor Mode)
+        // Removed border to match user preference for cleaner look in inputs too
+        if (text.trim().startsWith('```')) return 'font-mono text-sm bg-[#f6f8fa] p-3 rounded-lg text-gray-800 leading-relaxed';
         return 'text-base leading-relaxed'; 
     };
 
@@ -301,26 +295,43 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
                                 components={{
                                     p: ({node, ...props}) => <p className="mb-1" {...props} />,
                                     img: ({node, ...props}) => <img className="max-h-96 rounded-lg my-2 shadow-sm border border-gray-100" {...props} />,
-                                    code({node, inline, className, children, ...props}: any) {
+                                    code({node, className, children, ...props}: any) {
                                         const match = /language-(\w+)/.exec(className || '');
                                         const language = match ? match[1] : '';
                                         
-                                        if (!inline && language === 'mermaid') return <MermaidDiagram definition={String(children).replace(/\n$/, '')} />;
+                                        if (language === 'mermaid') return <MermaidDiagram definition={String(children).replace(/\n$/, '')} />;
                                         
-                                        return !inline && match ? (
-                                          <SyntaxHighlighter
-                                            {...props}
-                                            children={String(children).replace(/\n$/, '')}
-                                            style={vs}
-                                            language={language}
-                                            PreTag="div"
-                                            className="rounded-lg text-sm border border-gray-200 shadow-sm my-2 !bg-gray-50"
-                                          />
-                                        ) : (
-                                          <code className={inline ? "bg-gray-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200" : "bg-gray-50 rounded-lg p-4 block overflow-x-auto text-sm my-4 border border-gray-100"} {...props}>
+                                        if (match) {
+                                          return (
+                                            <SyntaxHighlighter
+                                              {...props}
+                                              children={String(children).replace(/\n$/, '')}
+                                              style={vs}
+                                              language={language}
+                                              PreTag="div"
+                                              CodeTag="code"
+                                              customStyle={{
+                                                  backgroundColor: 'transparent',
+                                                  padding: 0,
+                                                  margin: 0,
+                                                  border: 'none',
+                                                  boxShadow: 'none',
+                                              }}
+                                              codeTagProps={{
+                                                  style: {
+                                                      fontFamily: "inherit",
+                                                      fontSize: 'inherit'
+                                                  }
+                                              }}
+                                            />
+                                          );
+                                        }
+
+                                        return (
+                                          <code className={className} {...props}>
                                             {children}
                                           </code>
-                                        )
+                                        );
                                     },
                                 }}
                              >{content}</ReactMarkdown>

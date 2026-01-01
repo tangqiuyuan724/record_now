@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -20,28 +19,52 @@ const Preview: React.FC<PreviewProps> = ({ content, className }) => {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          code({node, inline, className, children, ...props}: any) {
+          code({node, className, children, ...props}: any) {
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : '';
             
-            if (!inline && language === 'mermaid') {
+            // Mermaid Diagram
+            if (language === 'mermaid') {
                 return <MermaidDiagram definition={String(children).replace(/\n$/, '')} />;
             }
 
-            return !inline && match ? (
-              <SyntaxHighlighter
-                {...props}
-                children={String(children).replace(/\n$/, '')}
-                style={vs}
-                language={language}
-                PreTag="div"
-                className="rounded-lg text-sm border border-gray-200 shadow-sm my-4 !bg-gray-50"
-              />
-            ) : (
-              <code className={inline ? "bg-gray-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200" : "bg-gray-50 rounded-lg p-4 block overflow-x-auto text-sm my-4 border border-gray-100"} {...props}>
+            // Syntax Highlighting (for fenced code blocks with language)
+            // We use PreTag="div" and style it transparently because the markdown parser
+            // already wraps this in a <pre> tag (which we style via CSS).
+            if (match) {
+              return (
+                <SyntaxHighlighter
+                  {...props}
+                  children={String(children).replace(/\n$/, '')}
+                  style={vs}
+                  language={language}
+                  PreTag="div"
+                  CodeTag="code"
+                  customStyle={{
+                      backgroundColor: 'transparent', // Let parent pre handle bg
+                      padding: 0,
+                      margin: 0,
+                      border: 'none',
+                      boxShadow: 'none',
+                  }}
+                  codeTagProps={{
+                      style: {
+                          fontFamily: "inherit",
+                          fontSize: 'inherit'
+                      }
+                  }}
+                />
+              );
+            }
+
+            // Default fallback for:
+            // 1. Inline code `code` (rendered as <code>...</code>) -> Styled by CSS .prose code:not(pre code)
+            // 2. Generic block code ``` ``` (rendered as <pre><code>...</code></pre>) -> Styled by CSS .prose pre
+            return (
+              <code className={className} {...props}>
                 {children}
               </code>
-            )
+            );
           },
           // Custom styling for other elements to match Typora/Mac feel
           h1: ({node, ...props}) => <h1 className="text-3xl font-bold mt-8 mb-4 pb-2 border-b border-gray-100" {...props} />,

@@ -69,6 +69,56 @@
         justify-content: center;
         background-color: transparent;
       }
+
+      /* Fix for Tailwind Typography adding backticks to inline code */
+      .prose :where(code):not(:where([class~="not-prose"] *))::before {
+        content: none !important;
+      }
+      .prose :where(code):not(:where([class~="not-prose"] *))::after {
+        content: none !important;
+      }
+
+      /* --- Code Block & Inline Code Styling --- */
+
+      /* Inline Code: Only target code that is NOT inside a pre tag */
+      .prose code:not(pre code) {
+        background-color: #f6f8fa !important;
+        color: #24292f !important;
+        padding: 0.2em 0.4em !important;
+        border-radius: 6px !important;
+        font-size: 0.85em !important;
+        font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace !important;
+        border: 1px solid #d0d7de !important;
+        font-weight: 400 !important;
+        /* Ensure it behaves inline */
+        display: inline !important;
+        white-space: pre-wrap !important;
+      }
+
+      /* Block Code Container (pre) */
+      .prose pre {
+        background-color: #f6f8fa !important;
+        color: #24292f !important;
+        padding: 1rem !important;
+        border-radius: 8px !important;
+        border: 1px solid #d0d7de !important;
+        margin-top: 1rem !important;
+        margin-bottom: 1rem !important;
+        line-height: 1.45 !important;
+        overflow-x: auto !important;
+      }
+
+      /* Code INSIDE Block: Reset styles so parent pre handles the box */
+      .prose pre code {
+        background-color: transparent !important;
+        color: inherit !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        font-size: 0.9em !important;
+        font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace !important;
+        font-weight: inherit !important;
+      }
     </style>
 <script type="importmap">
 {
