@@ -1,9 +1,12 @@
+
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import MermaidDiagram from './MermaidDiagram';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface PreviewProps {
   content: string;
@@ -25,14 +28,17 @@ const Preview: React.FC<PreviewProps> = ({ content, className }) => {
                 return <MermaidDiagram definition={String(children).replace(/\n$/, '')} />;
             }
 
-            return !inline ? (
-              <pre className="bg-gray-50 rounded-lg p-4 overflow-x-auto text-sm my-4 border border-gray-100">
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              </pre>
+            return !inline && match ? (
+              <SyntaxHighlighter
+                {...props}
+                children={String(children).replace(/\n$/, '')}
+                style={vs}
+                language={language}
+                PreTag="div"
+                className="rounded-lg text-sm border border-gray-200 shadow-sm my-4 !bg-gray-50"
+              />
             ) : (
-              <code className="bg-gray-100 px-1 py-0.5 rounded text-sm text-red-500 font-mono" {...props}>
+              <code className={inline ? "bg-gray-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200" : "bg-gray-50 rounded-lg p-4 block overflow-x-auto text-sm my-4 border border-gray-100"} {...props}>
                 {children}
               </code>
             )

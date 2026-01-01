@@ -7,6 +7,8 @@ import rehypeKatex from 'rehype-katex';
 import MermaidDiagram from './MermaidDiagram';
 import TableEditor from './TableEditor';
 import { generateId, convertFileToBase64, isTableLine } from '../utils/helpers';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface HybridEditorProps {
   content: string;
@@ -36,23 +38,43 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
         if (content) {
             const lines = content.split('\n');
             const newBlocks: Block[] = [];
-            let currentTableBuffer: string[] = [];
-
-            lines.forEach(line => {
-                if (isTableLine(line)) {
-                    currentTableBuffer.push(line);
-                } else {
-                    // Flush table buffer if we hit a non-table line
-                    if (currentTableBuffer.length > 0) {
-                        newBlocks.push({ id: generateId(), content: currentTableBuffer.join('\n'), type: 'table' });
-                        currentTableBuffer = [];
+            let i = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i];
+                
+                // Code Block Detection (Group lines between ``` and ```)
+                if (line.trim().startsWith('```')) {
+                    const buffer = [line];
+                    i++;
+                    while(i < lines.length) {
+                        buffer.push(lines[i]);
+                        // Check for closing fence (allow leading spaces)
+                        if (lines[i].trim().startsWith('```')) {
+                            i++;
+                            break;
+                        }
+                        i++;
                     }
-                    newBlocks.push({ id: generateId(), content: line, type: 'text' });
+                    newBlocks.push({ id: generateId(), content: buffer.join('\n'), type: 'text' });
+                    continue;
                 }
-            });
-            // Flush remaining table buffer
-            if (currentTableBuffer.length > 0) {
-                newBlocks.push({ id: generateId(), content: currentTableBuffer.join('\n'), type: 'table' });
+
+                // Table Detection
+                if (isTableLine(line)) {
+                    const buffer = [line];
+                    i++;
+                    while (i < lines.length && isTableLine(lines[i])) {
+                        buffer.push(lines[i]);
+                        i++;
+                    }
+                     newBlocks.push({ id: generateId(), content: buffer.join('\n'), type: 'table' });
+                    continue;
+                }
+                
+                // Regular Text Line
+                newBlocks.push({ id: generateId(), content: line, type: 'text' });
+                i++;
             }
             setBlocks(newBlocks);
         } else {
@@ -80,12 +102,31 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, id: string) => {
     // ENTER: Create new block
+    // Shift+Enter is naturally handled by textarea for new lines within the block
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      
       const currentBlock = blocks[index];
       
-      // Auto-Table Creation: Check if user typed valid table syntax like `| a | b |`
+      // If we are inside a code block (starts with ```), Enter should insert newline, not split block
+      // unless we are specifically wanting to break out? 
+      // Typora behavior: standard Enter in code block adds newline. 
+      // Cmd+Enter or exiting block splits. 
+      // For now, let's keep it simple: if it detects it's a code block, allow multiline.
+      if (currentBlock.content.trim().startsWith('```') && !currentBlock.content.trim().endsWith('```')) {
+          // It's an open code block, allow default Enter (textarea handles it)
+          return; 
+      }
+      
+      // If the block content is a closed code block, assume user wants to create a new block below
+      if (currentBlock.content.trim().startsWith('```') && (currentBlock.content.match(/```/g) || []).length >= 2) {
+          // Proceed to create new block below
+      } else if (currentBlock.content.trim().startsWith('```')) {
+          // Inside open code block, don't prevent default
+          return;
+      }
+
+      e.preventDefault();
+      
+      // Auto-Table Creation
       if (currentBlock.type === 'text' && currentBlock.content.trim().startsWith('|') && (currentBlock.content.match(/\|/g) || []).length >= 2) {
           const headers = currentBlock.content.trim().split('|').filter(s => s).map(s => s.trim());
           if (headers.length > 0) {
@@ -128,8 +169,19 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
       }
     } 
     // NAVIGATION: Arrows
-    else if (e.key === 'ArrowUp' && index > 0) setFocusedBlockId(blocks[index - 1].id);
-    else if (e.key === 'ArrowDown' && index < blocks.length - 1) setFocusedBlockId(blocks[index + 1].id);
+    else if (e.key === 'ArrowUp' && index > 0) {
+        // Only navigate if cursor is at start? Simplified for now.
+        // For textareas, this might conflict with internal navigation. 
+        // Ideally check cursor position.
+        if (!blocks[index].content.includes('\n')) { // Simple check to avoid jumping out of multiline blocks too easily
+             setFocusedBlockId(blocks[index - 1].id);
+        }
+    }
+    else if (e.key === 'ArrowDown' && index < blocks.length - 1) {
+        if (!blocks[index].content.includes('\n')) {
+            setFocusedBlockId(blocks[index + 1].id);
+        }
+    }
   };
 
   const handleContainerDrop = async (e: React.DragEvent) => {
@@ -223,7 +275,7 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
         if (text.startsWith('## ')) return 'text-2xl font-bold pb-2 mt-3';
         if (text.startsWith('### ')) return 'text-xl font-bold pb-2 mt-2';
         if (text.startsWith('> ')) return 'italic text-gray-500 border-l-4 border-gray-300 pl-4 py-1';
-        if (text.startsWith('```')) return 'font-mono text-sm bg-gray-50 p-3 rounded-lg text-gray-600 border border-gray-100';
+        if (text.trim().startsWith('```')) return 'font-mono text-sm bg-gray-50 p-3 rounded-lg text-gray-600 border border-gray-100 leading-relaxed';
         return 'text-base leading-relaxed'; 
     };
 
@@ -251,11 +303,23 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
                                     img: ({node, ...props}) => <img className="max-h-96 rounded-lg my-2 shadow-sm border border-gray-100" {...props} />,
                                     code({node, inline, className, children, ...props}: any) {
                                         const match = /language-(\w+)/.exec(className || '');
-                                        if (!inline && match && match[1] === 'mermaid') return <MermaidDiagram definition={String(children).replace(/\n$/, '')} />;
-                                        return !inline ? (
-                                          <pre className="bg-gray-50 rounded-lg p-4 overflow-x-auto text-sm my-4 border border-gray-100"><code className={className} {...props}>{children}</code></pre>
+                                        const language = match ? match[1] : '';
+                                        
+                                        if (!inline && language === 'mermaid') return <MermaidDiagram definition={String(children).replace(/\n$/, '')} />;
+                                        
+                                        return !inline && match ? (
+                                          <SyntaxHighlighter
+                                            {...props}
+                                            children={String(children).replace(/\n$/, '')}
+                                            style={vs}
+                                            language={language}
+                                            PreTag="div"
+                                            className="rounded-lg text-sm border border-gray-200 shadow-sm my-2 !bg-gray-50"
+                                          />
                                         ) : (
-                                          <code className="bg-gray-100 px-1 py-0.5 rounded text-sm text-red-500 font-mono" {...props}>{children}</code>
+                                          <code className={inline ? "bg-gray-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200" : "bg-gray-50 rounded-lg p-4 block overflow-x-auto text-sm my-4 border border-gray-100"} {...props}>
+                                            {children}
+                                          </code>
                                         )
                                     },
                                 }}
