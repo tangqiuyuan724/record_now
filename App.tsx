@@ -45,7 +45,10 @@ const App: React.FC = () => {
     // PDF Export triggers the browser print dialog.
     // The actual content formatting is handled by CSS in index.html targeting the .print-container
     if (format === 'pdf') {
-        window.print();
+        // Delay printing slightly to allow React to unmount the export menu
+        setTimeout(() => {
+            window.print();
+        }, 100);
         return;
     }
 
@@ -98,7 +101,7 @@ const App: React.FC = () => {
   return (
     <>
     {/* Main Application Container - Hidden during Print */}
-    <div className="app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans">
+    <div className="app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans print:hidden">
       
       {/* Sidebar - File Explorer */}
       <div className={`transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 border-r border-mac-divider ${sidebarVisible ? 'w-64' : 'w-0'}`}>
@@ -212,8 +215,8 @@ const App: React.FC = () => {
     </div>
 
     {/* DEDICATED PRINT VIEW */}
-    {/* This is hidden by default and only shown during printing via CSS in index.html */}
-    <div className="print-container hidden bg-white">
+    {/* This is hidden by default and only shown during printing via CSS/Tailwind */}
+    <div className="print-container hidden print:block bg-white w-full h-auto">
         {activeFile && (
             <div className="max-w-4xl mx-auto p-12">
                 <Preview content={activeFile.content} />

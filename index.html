@@ -122,27 +122,32 @@
 
       /* --- PRINT STYLES --- */
       @media print {
-        /* Hide the entire interactive application */
-        .app-container {
-            display: none !important;
+        @page {
+          margin: 15mm;
+          size: auto;
         }
 
-        /* Show the dedicated print container */
+        /* Force override body styles to allow scrolling/paging */
+        body, html, #root {
+          height: auto !important;
+          width: 100% !important;
+          overflow: visible !important;
+          position: static !important;
+          background-color: white !important;
+          display: block !important;
+        }
+        
+        /* Ensure the print container is visible and flows naturally */
         .print-container {
             display: block !important;
-            position: static !important;
-            width: 100% !important;
             height: auto !important;
             overflow: visible !important;
+            position: static !important;
         }
 
-        /* Reset global constraints to allow multipage printing */
-        body, html, #root {
-            height: auto !important;
-            width: 100% !important;
-            overflow: visible !important;
-            position: static !important;
-            background-color: white !important;
+        /* Explicitly hide the app UI container */
+        .app-container {
+            display: none !important;
         }
       }
     </style>
@@ -166,7 +171,7 @@
 }
 </script>
 </head>
-  <body class="bg-white text-mac-text h-screen w-screen flex flex-col">
+  <body class="bg-white text-mac-text h-screen w-screen flex flex-col print:block print:h-auto print:w-auto print:overflow-visible">
     <div id="root" class="h-full w-full"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
