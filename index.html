@@ -151,6 +151,36 @@
         .app-container {
             display: none !important;
         }
+
+        /* --- Table Hack for Repeating Margins --- */
+        /* Using a table structure allows thead/tfoot to repeat on every page, creating virtual margins */
+        table.print-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 0;
+            margin: 0;
+            padding: 0;
+            page-break-inside: auto;
+        }
+        
+        table.print-table tr {
+            page-break-inside: auto;
+            page-break-after: auto;
+        }
+
+        table.print-table thead {
+            display: table-header-group;
+        }
+        
+        table.print-table tfoot {
+            display: table-footer-group;
+        }
+
+        .print-spacer {
+            height: 15mm; /* Height of the top/bottom margin */
+            width: 100%;
+            display: block;
+        }
       }
     </style>
 <script type="importmap">

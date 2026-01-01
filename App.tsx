@@ -236,13 +236,24 @@ const App: React.FC = () => {
       </div>
     </div>
 
-    {/* DEDICATED PRINT VIEW */}
-    {/* Only visible when printing is active. CSS also ensures it's visible in print media. */}
+    {/* DEDICATED PRINT VIEW - Using Table Hack for Repeating Margins */}
     <div className={`print-container bg-white w-full h-auto ${isPrinting ? 'block' : 'hidden'}`}>
         {activeFile && (
-            <div className="w-full px-[20mm] py-[15mm]">
-                <Preview content={activeFile.content} />
-            </div>
+            <table className="print-table">
+                <thead>
+                    <tr><td><div className="print-spacer"></div></td></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td className="px-[20mm] align-top">
+                            <Preview content={activeFile.content} />
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr><td><div className="print-spacer"></div></td></tr>
+                </tfoot>
+            </table>
         )}
     </div>
     </>
