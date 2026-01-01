@@ -51,7 +51,9 @@
     "productName": "RecordNow",
     "mac": {
       "category": "public.app-category.productivity",
-      "target": ["dmg", "zip"]
+      "target": ["dmg", "zip"],
+      "identity": null,
+      "icon": "assets/icon.icns"
     },
     "directories": {
       "output": "release"
