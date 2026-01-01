@@ -121,7 +121,9 @@
       }
 
       /* --- PRINT STYLES --- */
-      @media print {
+      
+      /* Apply these styles when printing OR when the body has the 'printing' class */
+      @media print, body.printing {
         @page {
           margin: 15mm;
           size: auto;
@@ -171,7 +173,7 @@
 }
 </script>
 </head>
-  <body class="bg-white text-mac-text h-screen w-screen flex flex-col print:block print:h-auto print:w-auto print:overflow-visible">
+  <body class="bg-white text-mac-text h-screen w-screen flex flex-col">
     <div id="root" class="h-full w-full"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

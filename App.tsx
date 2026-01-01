@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('hybrid');
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false); // New state to control print view
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menus on click outside
@@ -38,16 +39,36 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Handle Printing Lifecycle
+  useEffect(() => {
+    // When isPrinting becomes true, body gets 'printing' class via CSS logic if we wanted, 
+    // but here we manually toggle class to be safe and robust
+    if (isPrinting) {
+      document.body.classList.add('printing');
+    } else {
+      document.body.classList.remove('printing');
+    }
+
+    const afterPrintHandler = () => {
+      setIsPrinting(false);
+    };
+
+    window.addEventListener('afterprint', afterPrintHandler);
+    return () => window.removeEventListener('afterprint', afterPrintHandler);
+  }, [isPrinting]);
+
   const handleExport = async (format: 'pdf' | 'html' | 'md') => {
     setExportMenuOpen(false);
     if (!activeFile) return;
 
-    // PDF Export triggers the browser print dialog.
-    // The actual content formatting is handled by CSS in index.html targeting the .print-container
     if (format === 'pdf') {
-        // Delay printing slightly to allow React to unmount the export menu
+        // 1. Enter Print Mode (Changes DOM to hide UI and show only preview)
+        setIsPrinting(true);
+        
+        // 2. Wait for DOM update, then print
         setTimeout(() => {
             window.print();
+            // Note: window.print() is blocking in some environments, but afterprint event handles reset
         }, 100);
         return;
     }
@@ -100,8 +121,9 @@ const App: React.FC = () => {
 
   return (
     <>
-    {/* Main Application Container - Hidden during Print */}
-    <div className="app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans print:hidden">
+    {/* Main Application Container */}
+    {/* We hide this ENTIRE container when in printing mode. This guarantees no sidebar/popups. */}
+    <div className={`app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans ${isPrinting ? 'hidden' : ''}`}>
       
       {/* Sidebar - File Explorer */}
       <div className={`transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 border-r border-mac-divider ${sidebarVisible ? 'w-64' : 'w-0'}`}>
@@ -215,8 +237,8 @@ const App: React.FC = () => {
     </div>
 
     {/* DEDICATED PRINT VIEW */}
-    {/* This is hidden by default and only shown during printing via CSS/Tailwind */}
-    <div className="print-container hidden print:block bg-white w-full h-auto">
+    {/* Only visible when printing is active. CSS also ensures it's visible in print media. */}
+    <div className={`print-container bg-white w-full h-auto ${isPrinting ? 'block' : 'hidden'}`}>
         {activeFile && (
             <div className="max-w-4xl mx-auto p-12">
                 <Preview content={activeFile.content} />
