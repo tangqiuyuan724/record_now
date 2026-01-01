@@ -52,9 +52,17 @@ export const useFileSystem = () => {
       setFolderName(dirHandle.name);
       await scanDirectory(dirHandle);
       setActiveFileId(null);
-    } catch (err) {
-      console.warn('File System Access API failed or cancelled, using Local Storage.', err);
-      useLocalStorageFallback();
+    } catch (err: any) {
+      // If user cancels the picker, do nothing (keep current state)
+      if (err.name === 'AbortError') return;
+
+      console.warn('File System Access API failed, using Local Storage.', err);
+      // Only fallback to local storage if we really need to (e.g. serious error, or explicit choice elsewhere)
+      // For now, if it fails, we assume fallback is acceptable or we are already in fallback mode.
+      // But let's check if we already have a folder open.
+      if (!rootDirHandle && !folderName) {
+         useLocalStorageFallback();
+      }
     }
   };
 

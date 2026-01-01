@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { FileDocument } from '../types';
-import { FileText, Plus, Trash2, FolderOpen, Folder } from 'lucide-react';
+import { FileText, Plus, Trash2, FolderOpen, Folder, ChevronDown } from 'lucide-react';
 
 interface SidebarProps {
   files: FileDocument[];
@@ -24,21 +25,30 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="w-64 bg-mac-sidebar border-r border-mac-divider flex flex-col h-full select-none">
       {/* Title Bar Area */}
-      <div className="h-12 flex items-center px-4 border-b border-mac-divider/50 bg-mac-sidebar z-10">
-        <div className="flex-1 flex items-center gap-2 overflow-hidden">
+      <div className="h-12 flex items-center px-4 border-b border-mac-divider/50 bg-mac-sidebar z-10 gap-2">
+        <div 
+            onClick={onOpenFolder}
+            className="flex-1 flex items-center gap-2 overflow-hidden cursor-pointer hover:bg-black/5 py-1 px-1.5 -ml-1.5 rounded-md transition-colors group"
+            title="Click to switch folder"
+        >
             {folderName ? (
                 <>
                     <Folder size={14} className="text-blue-500 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-gray-700 truncate" title={folderName}>{folderName}</span>
+                    <span className="text-sm font-semibold text-gray-700 truncate">{folderName}</span>
+                    <ChevronDown size={12} className="text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </>
             ) : (
-                <span className="text-xs font-semibold text-gray-500 tracking-wide">NO FOLDER OPEN</span>
+                <>
+                    <span className="text-xs font-semibold text-gray-500 tracking-wide">NO FOLDER</span>
+                    <ChevronDown size={12} className="text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                </>
             )}
         </div>
+        
         {folderName && (
             <button 
-              onClick={onCreateFile}
-              className="p-1 hover:bg-gray-200 rounded transition-colors text-gray-600 ml-2"
+              onClick={(e) => { e.stopPropagation(); onCreateFile(); }}
+              className="p-1 hover:bg-gray-200 rounded transition-colors text-gray-600 flex-shrink-0"
               title="New File"
             >
               <Plus size={16} />
@@ -55,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenFolder}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-md text-sm text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all"
             >
-                <FolderOpen size={14} /> Open
+                <FolderOpen size={14} /> Open Folder
             </button>
           </div>
         ) : files.length === 0 ? (
@@ -101,9 +111,9 @@ const Sidebar: React.FC<SidebarProps> = ({
            <div className="px-4 py-2 border-t border-mac-divider bg-mac-sidebar">
                <button 
                 onClick={onOpenFolder}
-                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors w-full"
                >
-                   <FolderOpen size={10} /> Change Folder...
+                   <FolderOpen size={10} /> Switch Folder...
                </button>
            </div>
       )}
