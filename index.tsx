@@ -2,7 +2,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
 
 // --- Global Error Handler Setup ---
 const sendErrorToMain = (message: string) => {
