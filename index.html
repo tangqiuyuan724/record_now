@@ -119,6 +119,32 @@
         font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace !important;
         font-weight: inherit !important;
       }
+
+      /* --- PRINT STYLES --- */
+      @media print {
+        /* Hide the entire interactive application */
+        .app-container {
+            display: none !important;
+        }
+
+        /* Show the dedicated print container */
+        .print-container {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* Reset global constraints to allow multipage printing */
+        body, html, #root {
+            height: auto !important;
+            width: 100% !important;
+            overflow: visible !important;
+            position: static !important;
+            background-color: white !important;
+        }
+      }
     </style>
 <script type="importmap">
 {

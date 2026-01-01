@@ -42,6 +42,8 @@ const App: React.FC = () => {
     setExportMenuOpen(false);
     if (!activeFile) return;
 
+    // PDF Export triggers the browser print dialog.
+    // The actual content formatting is handled by CSS in index.html targeting the .print-container
     if (format === 'pdf') {
         window.print();
         return;
@@ -53,8 +55,14 @@ const App: React.FC = () => {
 
     if (format === 'html') {
         content = `<!DOCTYPE html><html><head><title>${activeFile.title}</title>
-        <style>body{font-family:-apple-system,sans-serif;max-width:800px;margin:20px auto;line-height:1.6}</style>
-        </head><body><pre>${activeFile.content}</pre></body></html>`;
+        <style>body{font-family:-apple-system,sans-serif;max-width:800px;margin:20px auto;line-height:1.6;padding:20px;}</style>
+        <!-- KaTeX Style -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+        </head><body>
+        <!-- Note: This is raw Markdown export wrapped in HTML. A real HTML export would need SSG rendering. 
+             For this scope, we export the markdown source or a basic container. -->
+        <pre style="white-space: pre-wrap;">${activeFile.content}</pre>
+        </body></html>`;
         mimeType = 'text/html';
     }
 
@@ -72,7 +80,11 @@ const App: React.FC = () => {
         } else {
             throw new Error("Fallback needed");
         }
-    } catch (e) {
+    } catch (e: any) {
+        // Fix: Stop execution if user cancelled the save dialog
+        if (e.name === 'AbortError') return;
+
+        console.warn("Export fallback triggered:", e);
         // Fallback Download
         const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
         const a = document.createElement('a');
@@ -84,10 +96,12 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans">
+    <>
+    {/* Main Application Container - Hidden during Print */}
+    <div className="app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans">
       
       {/* Sidebar - File Explorer */}
-      <div className={`no-print transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 border-r border-mac-divider ${sidebarVisible ? 'w-64' : 'w-0'}`}>
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 border-r border-mac-divider ${sidebarVisible ? 'w-64' : 'w-0'}`}>
         <Sidebar 
           files={files} 
           folderName={folderName}
@@ -103,7 +117,7 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 bg-white">
         
         {/* Top Toolbar */}
-        <div className="no-print h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarVisible(!sidebarVisible)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
               {sidebarVisible ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
@@ -196,6 +210,17 @@ const App: React.FC = () => {
         )}
       </div>
     </div>
+
+    {/* DEDICATED PRINT VIEW */}
+    {/* This is hidden by default and only shown during printing via CSS in index.html */}
+    <div className="print-container hidden bg-white">
+        {activeFile && (
+            <div className="max-w-4xl mx-auto p-12">
+                <Preview content={activeFile.content} />
+            </div>
+        )}
+    </div>
+    </>
   );
 };
 
