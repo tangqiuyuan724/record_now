@@ -1,27 +1,62 @@
+
 {
-  "name": "record_now",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "record-now",
+  "productName": "RecordNow",
+  "version": "1.0.0",
+  "description": "Elegant Markdown Editor for macOS",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron:dev": "vite",
+    "electron:start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
+  "keywords": [
+    "markdown",
+    "editor",
+    "electron",
+    "mac"
+  ],
+  "author": "RecordNow Team",
+  "license": "MIT",
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
+    "lucide-react": "^0.344.0",
+    "mermaid": "^10.9.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.1",
     "rehype-katex": "^7.0.0",
-    "mermaid": "^11.4.1",
-    "lucide-react": "^0.562.0"
+    "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.18",
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.5"
+  },
+  "build": {
+    "appId": "com.recordnow.app",
+    "productName": "RecordNow",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"]
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ]
   }
 }
