@@ -11,13 +11,14 @@
 *   **本地文件系统集成**: 直接读取和保存本地 `.md` 文件，支持打开文件夹作为侧边栏工作区。
 *   **可视化表格编辑**: 内置强大的 GUI 表格编辑器，支持行列添加、删除和拖拽排序，无需手动编写繁琐的 Markdown 表格语法。
 *   **实时预览**: 支持 Split（分栏）和 Preview（纯预览）模式。
+*   **健壮的错误日志系统**: 自动捕获主进程与渲染进程的异常，方便排查问题。
 *   **丰富的内容支持**:
     *   LaTeX 数学公式渲染 (`$E=mc^2$`)
     *   Mermaid 图表支持 (流程图、时序图等)
     *   代码高亮
     *   图片拖拽上传（转为 Base64）
 *   **多格式导出**: 支持导出为 PDF (通过打印预览)、HTML 和 Markdown。
-*   **MacOS 原生体验**: 沉浸式无边框设计，毛玻璃效果顶部栏，原生窗口控制。
+*   **MacOS 原生体验**: 沉浸式无边框设计，毛玻璃效果顶部栏，原生窗口控制，自定义应用图标。
 
 ## 🛠 技术栈
 
@@ -68,19 +69,31 @@ node build_app.js
 *   `RecordNow-1.0.0.dmg` (macOS 安装包)
 *   `RecordNow-1.0.0-mac.zip` (绿色版)
 
+## 🐞 故障排查与日志
+
+应用内置了自动日志记录功能，用于追踪运行时的错误和异常。
+
+*   **日志位置 (macOS)**: `~/Library/Application Support/RecordNow/app.log`
+*   **记录内容**:
+    *   应用启动与关闭时间。
+    *   主进程 (Main Process) 的未捕获异常。
+    *   渲染进程 (Renderer Process) 的 JS 错误与 Promise 拒绝。
+
 ## 📂 项目结构
 
 ```
 RecordNow/
 ├── build_app.js         # 自动化构建脚本
+├── assets/              # 静态资源 (icon.svg)
 ├── electron/
-│   └── main.js          # Electron 主进程 (窗口管理, 权限控制)
+│   ├── main.js          # Electron 主进程 (窗口管理, 文件日志)
+│   └── preload.js       # 预加载脚本 (安全 IPC 通信)
 ├── src/                 # (根目录即源码目录)
 │   ├── components/      # React 组件 (Sidebar, Editor, Preview...)
 │   ├── hooks/           # 自定义 Hooks (useFileSystem)
 │   ├── utils/           # 工具函数 (Storage, Helpers)
 │   ├── App.tsx          # 主应用组件
-│   └── index.tsx        # 入口文件
+│   └── index.tsx        # 入口文件 (包含全局错误捕获)
 ├── index.html           # Web 入口
 ├── package.json         # 依赖与脚本配置
 └── vite.config.ts       # Vite 配置

@@ -1,6 +1,44 @@
 
-const { app, BrowserWindow, session, shell } = require('electron');
+const { app, BrowserWindow, session, shell, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// --- Logging System Setup ---
+// Logs will be saved to: ~/Library/Application Support/RecordNow/app.log (on macOS)
+const logFilePath = path.join(app.getPath('userData'), 'app.log');
+
+function logToFile(message) {
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] ${message}\n`;
+  
+  // Append to log file synchronously to ensure it's written before a crash
+  try {
+    fs.appendFileSync(logFilePath, logEntry);
+  } catch (error) {
+    console.error('Failed to write to log file:', error);
+  }
+  
+  // Also output to console for development visibility
+  console.log(logEntry.trim());
+}
+
+// Log app lifecycle events
+logToFile('=== Application Started ===');
+logToFile(`Log file location: ${logFilePath}`);
+
+// Catch Main Process Errors (Global)
+process.on('uncaughtException', (error) => {
+  logToFile(`[Main Process Uncaught Exception]: ${error.stack || error}`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logToFile(`[Main Process Unhandled Rejection]: ${reason}`);
+});
+
+// Handle Renderer Process Errors via IPC
+ipcMain.on('log-error', (event, message) => {
+  logToFile(message);
+});
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -18,7 +56,8 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false, // Required for File System Access API in some cases
-      webSecurity: true
+      webSecurity: true,
+      preload: path.join(__dirname, 'preload.js') // Inject preload script
     },
     backgroundColor: '#ffffff'
   });
@@ -61,6 +100,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  logToFile('=== Application Closing ===');
   if (process.platform !== 'darwin') {
     app.quit();
   }
