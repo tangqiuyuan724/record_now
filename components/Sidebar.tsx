@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileDocument } from '../types';
-import { FileText, Plus, Trash2, FolderOpen, Folder, ChevronDown } from 'lucide-react';
+import { FileText, Plus, Trash2, FolderOpen, ChevronDown, Pencil } from 'lucide-react';
 
 interface SidebarProps {
   files: FileDocument[];
@@ -9,6 +9,7 @@ interface SidebarProps {
   activeFileId: string | null;
   onSelectFile: (id: string) => void;
   onCreateFile: () => void;
+  onRenameFile: (id: string, newTitle: string) => void;
   onDeleteFile: (id: string, e: React.MouseEvent) => void;
   onOpenFolder: () => void;
 }
@@ -19,9 +20,42 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeFileId, 
   onSelectFile, 
   onCreateFile, 
+  onRenameFile,
   onDeleteFile,
   onOpenFolder
 }) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+    }
+  }, [editingId]);
+
+  const startRenaming = (file: FileDocument, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(file.id);
+    setEditValue(file.title);
+  };
+
+  const handleRenameSubmit = () => {
+    if (editingId && editValue.trim()) {
+        onRenameFile(editingId, editValue.trim());
+    }
+    setEditingId(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+        handleRenameSubmit();
+    } else if (e.key === 'Escape') {
+        setEditingId(null);
+    }
+  };
+
   return (
     <div className="w-64 bg-mac-sidebar border-r border-mac-divider flex flex-col h-full select-none">
       {/* Title Bar Area */}
@@ -33,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
             {folderName ? (
                 <>
-                    <Folder size={14} className="text-blue-500 flex-shrink-0" />
+                    <FolderOpen size={14} className="text-blue-500 flex-shrink-0" />
                     <span className="text-sm font-semibold text-gray-700 truncate">{folderName}</span>
                     <ChevronDown size={12} className="text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </>
@@ -83,24 +117,50 @@ const Sidebar: React.FC<SidebarProps> = ({
                   : 'hover:bg-gray-100 text-gray-700'
               }`}
             >
-              <div className="flex items-center gap-2 overflow-hidden">
-                <FileText size={14} className={activeFileId === file.id ? 'text-blue-500' : 'text-gray-400'} />
-                <span className={`truncate ${activeFileId === file.id ? 'font-medium' : ''}`}>
-                  {file.title}
-                </span>
+              <div className="flex items-center gap-2 overflow-hidden flex-1">
+                <FileText size={14} className={`flex-shrink-0 ${activeFileId === file.id ? 'text-blue-500' : 'text-gray-400'}`} />
+                
+                {editingId === file.id ? (
+                    <input 
+                        ref={inputRef}
+                        type="text" 
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={handleRenameSubmit}
+                        onKeyDown={handleKeyDown}
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white border border-blue-400 rounded px-1 py-0.5 text-xs w-full focus:outline-none text-gray-800"
+                    />
+                ) : (
+                    <span 
+                        className={`truncate ${activeFileId === file.id ? 'font-medium' : ''}`}
+                        onDoubleClick={(e) => startRenaming(file, e)}
+                        title={file.id}
+                    >
+                      {file.title}
+                    </span>
+                )}
               </div>
               
-              {/* Optional: Delete button, kept subtle */}
-              <button
-                onClick={(e) => onDeleteFile(file.id, e)}
-                className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity ${
-                  activeFileId === file.id 
-                    ? 'hover:bg-blue-200 text-blue-600' 
-                    : 'hover:bg-gray-200 text-gray-400'
-                }`}
-              >
-                <Trash2 size={12} />
-              </button>
+              {/* Group Actions */}
+              {editingId !== file.id && (
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => startRenaming(file, e)}
+                        className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                        title="Rename"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => onDeleteFile(file.id, e)}
+                        className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-600"
+                        title="Delete"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                  </div>
+              )}
             </div>
           ))
         )}

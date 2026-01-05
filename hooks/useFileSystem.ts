@@ -139,6 +139,70 @@ export const useFileSystem = () => {
   };
 
   /**
+   * Renames a file.
+   * For Native FS: Creates new file -> Copies content -> Deletes old file.
+   */
+  const renameFile = async (id: string, newTitle: string) => {
+    const file = files.find(f => f.id === id);
+    if (!file) return;
+
+    // Clean title and ensure uniqueness logic could go here, 
+    // but we assume UI passes a valid string. 
+    // We do need to prevent overwriting existing files silently if possible.
+    
+    if (rootDirHandle && file.handle) {
+      const newFilename = newTitle.endsWith('.md') ? newTitle : `${newTitle}.md`;
+      if (files.some(f => f.id === newFilename && f.id !== id)) {
+        alert("A file with this name already exists.");
+        return;
+      }
+
+      try {
+        // 1. Create new file handle
+        const newHandle = await rootDirHandle.getFileHandle(newFilename, { create: true });
+        
+        // 2. Ensure content is loaded
+        let contentToMove = file.content;
+        if (!contentToMove) {
+             const fileData = await file.handle.getFile();
+             contentToMove = await fileData.text();
+        }
+
+        // 3. Write to new file
+        const writable = await newHandle.createWritable();
+        await writable.write(contentToMove);
+        await writable.close();
+
+        // 4. Delete old file
+        await rootDirHandle.removeEntry(file.id);
+
+        // 5. Update State
+        setFiles(prev => prev.map(f => f.id === id ? { 
+            ...f, 
+            id: newFilename, 
+            title: newFilename.replace('.md', ''), 
+            handle: newHandle 
+        } : f));
+
+        if (activeFileId === id) setActiveFileId(newFilename);
+
+      } catch (e) {
+        console.error("Rename failed on File System:", e);
+        alert("Failed to rename file. Check permissions.");
+      }
+    } else {
+      // Local Storage Rename
+      // For local storage, 'id' is distinct from title usually, but let's keep them synced if ID was a filename logic,
+      // OR just update the title property. In the createFile logic above for LS, ID is random.
+      // However, the interface asks for 'rename', so we update the title.
+      
+      const updated = files.map(f => f.id === id ? { ...f, title: newTitle } : f);
+      setFiles(updated);
+      saveFiles(updated);
+    }
+  };
+
+  /**
    * Actual write operation to disk or local storage.
    */
   const persistFile = async (fileId: string, content: string) => {
@@ -181,10 +245,26 @@ export const useFileSystem = () => {
   };
 
   const deleteFile = (id: string) => {
-    const newFiles = files.filter(f => f.id !== id);
-    setFiles(newFiles);
-    if (!rootDirHandle) saveFiles(newFiles);
-    if (activeFileId === id) setActiveFileId(null);
+    // Confirmation is handled in UI
+    const file = files.find(f => f.id === id);
+    
+    const doDelete = async () => {
+        if (rootDirHandle && file?.handle) {
+            try {
+                await rootDirHandle.removeEntry(id);
+            } catch(e) {
+                console.error("Failed to delete from disk", e);
+                return;
+            }
+        }
+        
+        const newFiles = files.filter(f => f.id !== id);
+        setFiles(newFiles);
+        if (!rootDirHandle) saveFiles(newFiles);
+        if (activeFileId === id) setActiveFileId(null);
+    };
+    
+    doDelete();
   };
 
   return {
@@ -196,6 +276,7 @@ export const useFileSystem = () => {
     openFolder,
     selectFile,
     createFile,
+    renameFile,
     updateContent,
     deleteFile,
     useLocalStorageFallback

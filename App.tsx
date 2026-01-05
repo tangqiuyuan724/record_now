@@ -18,6 +18,7 @@ const App: React.FC = () => {
     openFolder, 
     selectFile, 
     createFile, 
+    renameFile,
     updateContent, 
     deleteFile 
   } = useFileSystem();
@@ -41,8 +42,6 @@ const App: React.FC = () => {
 
   // Handle Printing Lifecycle
   useEffect(() => {
-    // When isPrinting becomes true, body gets 'printing' class via CSS logic if we wanted, 
-    // but here we manually toggle class to be safe and robust
     if (isPrinting) {
       document.body.classList.add('printing');
     } else {
@@ -68,7 +67,6 @@ const App: React.FC = () => {
         // 2. Wait for DOM update, then print
         setTimeout(() => {
             window.print();
-            // Note: window.print() is blocking in some environments, but afterprint event handles reset
         }, 100);
         return;
     }
@@ -122,7 +120,6 @@ const App: React.FC = () => {
   return (
     <>
     {/* Main Application Container */}
-    {/* We hide this ENTIRE container when in printing mode. This guarantees no sidebar/popups. */}
     <div className={`app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans ${isPrinting ? 'hidden' : ''}`}>
       
       {/* Sidebar - File Explorer */}
@@ -133,6 +130,7 @@ const App: React.FC = () => {
           activeFileId={activeFileId} 
           onSelectFile={selectFile} 
           onCreateFile={createFile}
+          onRenameFile={renameFile}
           onDeleteFile={(id, e) => { e.stopPropagation(); if(confirm('Delete?')) deleteFile(id); }}
           onOpenFolder={openFolder}
         />

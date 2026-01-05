@@ -14,6 +14,7 @@ export interface FileSystemDirectoryHandle extends FileSystemHandle {
   kind: 'directory';
   values: () => AsyncIterableIterator<FileSystemHandle>;
   getFileHandle: (name: string, options?: { create?: boolean }) => Promise<FileSystemFileHandle>;
+  removeEntry: (name: string, options?: { recursive?: boolean }) => Promise<void>;
 }
 
 export interface FileSystemWritableFileStream extends WritableStream {
