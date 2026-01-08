@@ -1,10 +1,11 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import HybridEditor from './components/HybridEditor';
 import Preview from './components/Preview';
 import { ViewMode } from './types';
 import { useFileSystem } from './hooks/useFileSystem';
+import { parseHeadings } from './utils/helpers';
 import { Layout, Columns, Eye, CheckCircle, Save, PanelLeftClose, PanelLeftOpen, PenTool, Download, FileJson, FileText, FileCode, Printer, FolderOpen } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -28,6 +29,12 @@ const App: React.FC = () => {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false); // New state to control print view
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  // Derive headings from active file content
+  const headings = useMemo(() => {
+    return activeFile ? parseHeadings(activeFile.content) : [];
+  }, [activeFile?.content]);
 
   // Close menus on click outside
   useEffect(() => {
@@ -117,22 +124,53 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * Navigation Logic for Outline
+   * Scans the workspace container for elements containing the header text and scrolls them into view.
+   */
+  const handleNavigateHeading = (text: string) => {
+    if (!workspaceRef.current) return;
+
+    // Helper to find text in standard elements (h1-h6 in preview) or textareas/divs (in editor)
+    const findElementByText = (root: HTMLElement, searchText: string): HTMLElement | null => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        let node: Node | null;
+        while (node = walker.nextNode()) {
+            if (node.nodeValue?.trim() === searchText.trim()) {
+                // Return the parent element of the text node
+                return node.parentElement;
+            }
+        }
+        return null;
+    };
+
+    const target = findElementByText(workspaceRef.current, text);
+    if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Optional: Flash highlight
+        target.classList.add('bg-yellow-100', 'transition-colors', 'duration-500');
+        setTimeout(() => target.classList.remove('bg-yellow-100'), 1500);
+    }
+  };
+
   return (
     <>
     {/* Main Application Container */}
     <div className={`app-container flex h-screen w-screen bg-mac-bg text-gray-800 overflow-hidden font-sans ${isPrinting ? 'hidden' : ''}`}>
       
-      {/* Sidebar - File Explorer */}
+      {/* Sidebar - File Explorer & Outline */}
       <div className={`transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 border-r border-mac-divider ${sidebarVisible ? 'w-64' : 'w-0'}`}>
         <Sidebar 
           files={files} 
           folderName={folderName}
           activeFileId={activeFileId} 
+          headings={headings}
           onSelectFile={selectFile} 
           onCreateFile={createFile}
           onRenameFile={renameFile}
           onDeleteFile={(id, e) => { e.stopPropagation(); if(confirm('Delete?')) deleteFile(id); }}
           onOpenFolder={openFolder}
+          onNavigateHeading={handleNavigateHeading}
         />
       </div>
 
@@ -190,10 +228,14 @@ const App: React.FC = () => {
 
         {/* Workspace */}
         {activeFile ? (
-          <div className="flex-1 flex overflow-hidden relative">
+          <div className="flex-1 flex overflow-hidden relative" ref={workspaceRef}>
              {viewMode === 'hybrid' && (
                 <div className="flex-1 overflow-y-auto h-full">
-                    <HybridEditor content={activeFile.content} onChange={updateContent} />
+                    <HybridEditor 
+                        key={activeFile.id}
+                        content={activeFile.content} 
+                        onChange={updateContent} 
+                    />
                 </div>
             )}
             {viewMode === 'edit' && (

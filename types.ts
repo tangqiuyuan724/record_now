@@ -31,6 +31,12 @@ export interface FileDocument {
   isUnsaved?: boolean;
 }
 
+export interface Heading {
+  level: number;
+  text: string;
+  line: number;
+}
+
 export type ViewMode = 'edit' | 'split' | 'preview' | 'hybrid';
 
 export type SaveStatus = 'saved' | 'saving' | 'unsaved';
