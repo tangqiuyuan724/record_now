@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -100,6 +101,10 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
   // --- Event Handlers ---
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, id: string) => {
+    // Note: IME composition check is also handled in EditorBlock wrapper, 
+    // but we keep this check here as a fallback or if logic moves.
+    if (e.nativeEvent.isComposing) return;
+
     // ENTER: Create new block
     // Shift+Enter is naturally handled by textarea for new lines within the block
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -252,6 +257,8 @@ interface EditorBlockProps {
 
 const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, onChange, onKeyDown }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    // Ref to track IME composition state locally
+    const isComposing = useRef(false);
 
     useEffect(() => {
         if (isFocused && textareaRef.current) {
@@ -260,6 +267,15 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
             textareaRef.current.focus();
         }
     }, [isFocused, content]);
+
+    const handleKeyDownWrapper = (e: React.KeyboardEvent) => {
+        // Prevent triggering parent block navigation/creation if IME is active.
+        // Checking both the local ref and the native event for robustness.
+        if (isComposing.current || e.nativeEvent.isComposing) {
+            return;
+        }
+        onKeyDown(e);
+    };
 
     // Simple markdown syntax highlighter for the textarea input
     const getInputStyle = (text: string) => {
@@ -280,7 +296,9 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
                     ref={textareaRef}
                     value={content}
                     onChange={(e) => onChange(e.target.value)}
-                    onKeyDown={onKeyDown}
+                    onKeyDown={handleKeyDownWrapper}
+                    onCompositionStart={() => { isComposing.current = true; }}
+                    onCompositionEnd={() => { isComposing.current = false; }}
                     className={`w-full resize-none overflow-hidden bg-transparent focus:outline-none placeholder-gray-300 ${getInputStyle(content)}`}
                     placeholder="Type '/' for commands"
                     rows={1}
