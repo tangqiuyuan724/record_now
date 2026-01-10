@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -29,6 +29,8 @@ interface Block {
 const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+  // Track where the cursor should be positioned when a block gains focus
+  const [cursorOffset, setCursorOffset] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const initialized = useRef(false);
 
@@ -98,6 +100,21 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     });
   };
 
+  const handlePreviewClick = (e: React.MouseEvent, id: string) => {
+    // Try to approximate the click position to set the cursor
+    let offset = 0;
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && selection.anchorNode) {
+        // This is a naive approximation. It works well for plain text.
+        // For rich text, it gives the offset within the specific DOM node clicked.
+        // Improving this requires complex DOM-to-Markdown mapping.
+        offset = selection.anchorOffset;
+    }
+    
+    setCursorOffset(offset);
+    setFocusedBlockId(id);
+  };
+
   // --- Event Handlers ---
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, id: string) => {
@@ -153,6 +170,7 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
         newBlocks.splice(index + 1, 0, newBlock);
         updateParent(newBlocks);
         setFocusedBlockId(newBlock.id);
+        setCursorOffset(0); // New block starts at 0
         return newBlocks;
       });
     } 
@@ -160,22 +178,42 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     else if (e.key === 'Backspace' && blocks[index].content === '') {
       if (index > 0) {
         e.preventDefault();
+        const prevBlock = blocks[index - 1];
+        setCursorOffset(prevBlock.content.length); // Set cursor to end of previous block
+        setFocusedBlockId(prevBlock.id);
+        
         setBlocks(prev => {
             const newBlocks = prev.filter(b => b.id !== id);
             updateParent(newBlocks);
-            setFocusedBlockId(prev[index - 1].id);
             return newBlocks;
         });
       }
     } 
     // NAVIGATION: Arrows
     else if (e.key === 'ArrowUp' && index > 0) {
-        if (!blocks[index].content.includes('\n')) { 
-             setFocusedBlockId(blocks[index - 1].id);
+        // Only navigate if we are at the visual top of the block.
+        // For single-line inputs, this is always. For multiline, we'd need cursor position check.
+        // For now, simpler Logic: if it's a short line or explicit navigation desired.
+        // Note: native textarea up/down handles intra-block navigation.
+        
+        // We use a small timeout check or simply rely on textarea "top" logic, 
+        // but since we want block navigation, let's allow it if cursor is at 0? 
+        // Or strictly if it's a single line block to avoid frustration.
+        const textarea = e.currentTarget as HTMLTextAreaElement;
+        const isFirstLine = textarea.value.substr(0, textarea.selectionStart).split('\n').length === 1;
+
+        if (isFirstLine) {
+             const prevBlock = blocks[index - 1];
+             setCursorOffset(prevBlock.content.length); // Go to end of previous line
+             setFocusedBlockId(prevBlock.id);
         }
     }
     else if (e.key === 'ArrowDown' && index < blocks.length - 1) {
-        if (!blocks[index].content.includes('\n')) {
+        const textarea = e.currentTarget as HTMLTextAreaElement;
+        const isLastLine = textarea.value.substr(textarea.selectionEnd).split('\n').length === 1;
+
+        if (isLastLine) {
+            setCursorOffset(0); // Go to start of next line
             setFocusedBlockId(blocks[index + 1].id);
         }
     }
@@ -194,6 +232,7 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
                 return newBlocks;
             });
             setFocusedBlockId(newBlock.id);
+            setCursorOffset(0);
         } catch (err) { console.error(err); }
     }
   };
@@ -223,7 +262,8 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
                 <EditorBlock
                     content={block.content}
                     isFocused={focusedBlockId === block.id}
-                    onFocus={() => setFocusedBlockId(block.id)}
+                    cursorOffset={focusedBlockId === block.id ? cursorOffset : null}
+                    onFocus={(e) => handlePreviewClick(e, block.id)}
                     onChange={(val) => updateBlockContent(block.id, val)}
                     onKeyDown={(e) => handleKeyDown(e, index, block.id)}
                 />
@@ -233,11 +273,15 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
       
       {/* Empty space click handler to focus last block */}
       <div className="flex-1 min-h-[200px] cursor-text" onClick={() => {
-            if (blocks.length > 0) setFocusedBlockId(blocks[blocks.length - 1].id);
-            else {
+            if (blocks.length > 0) {
+                const lastBlock = blocks[blocks.length - 1];
+                setFocusedBlockId(lastBlock.id);
+                setCursorOffset(lastBlock.content.length);
+            } else {
                 const newBlock: Block = { id: generateId(), content: '', type: 'text' };
                 setBlocks([newBlock]);
                 setFocusedBlockId(newBlock.id);
+                setCursorOffset(0);
                 updateParent([newBlock]);
             }
       }} />
@@ -250,27 +294,40 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
 interface EditorBlockProps {
     content: string;
     isFocused: boolean;
-    onFocus: () => void;
+    cursorOffset: number | null;
+    onFocus: (e: React.MouseEvent) => void;
     onChange: (val: string) => void;
     onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, onChange, onKeyDown }) => {
+const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOffset, onFocus, onChange, onKeyDown }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Ref to track IME composition state locally
     const isComposing = useRef(false);
 
-    useEffect(() => {
+    // Use useLayoutEffect to prevent cursor jumping
+    useLayoutEffect(() => {
         if (isFocused && textareaRef.current) {
+            // Auto-resize
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+            
+            // Focus and set cursor
             textareaRef.current.focus();
+            
+            if (cursorOffset !== null) {
+                try {
+                    textareaRef.current.setSelectionRange(cursorOffset, cursorOffset);
+                } catch (e) {
+                    // Fallback if offset is out of bounds
+                    textareaRef.current.setSelectionRange(content.length, content.length);
+                }
+            }
         }
-    }, [isFocused, content]);
+    }, [isFocused, cursorOffset]); // Depend on cursorOffset to update when it changes
 
     const handleKeyDownWrapper = (e: React.KeyboardEvent) => {
         // Prevent triggering parent block navigation/creation if IME is active.
-        // Checking both the local ref and the native event for robustness.
         if (isComposing.current || e.nativeEvent.isComposing) {
             return;
         }
@@ -284,7 +341,6 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, onFocus, 
         if (text.startsWith('### ')) return 'text-xl font-bold pb-2 mt-2';
         if (text.startsWith('> ')) return 'italic text-gray-500 border-l-4 border-gray-300 pl-4 py-1';
         // Gray background for code block raw text (Editor Mode)
-        // Removed border to match user preference for cleaner look in inputs too
         if (text.trim().startsWith('```')) return 'font-mono text-sm bg-[#f6f8fa] p-3 rounded-lg text-gray-800 leading-relaxed';
         return 'text-base leading-relaxed'; 
     };
