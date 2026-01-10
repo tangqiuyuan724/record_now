@@ -94,7 +94,39 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
 
   const updateBlockContent = (id: string, newContent: string) => {
     setBlocks(prev => {
-      const newBlocks = prev.map(b => b.id === id ? { ...b, content: newContent } : b);
+      const index = prev.findIndex(b => b.id === id);
+      if (index === -1) return prev;
+
+      const currentBlock = prev[index];
+      const oldContent = currentBlock.content;
+      let shouldCreateNewBlock = false;
+      
+      // Logic: Detect if a code block was just closed
+      if (newContent.trim().startsWith('```')) {
+          const oldFences = (oldContent.match(/```/g) || []).length;
+          const newFences = (newContent.match(/```/g) || []).length;
+          
+          // If we transitioned from having < 2 fences (open/incomplete) to >= 2 fences (closed)
+          // AND the content ends with the fence (meaning user just typed it)
+          if (oldFences < 2 && newFences >= 2 && newContent.trim().endsWith('```')) {
+              shouldCreateNewBlock = true;
+          }
+      }
+
+      const newBlocks = [...prev];
+      newBlocks[index] = { ...currentBlock, content: newContent };
+      
+      if (shouldCreateNewBlock) {
+          const newBlock: Block = { id: generateId(), content: '', type: 'text' };
+          newBlocks.splice(index + 1, 0, newBlock);
+          
+          // Schedule focus update for the new block
+          setTimeout(() => {
+              setFocusedBlockId(newBlock.id);
+              setCursorOffset(0);
+          }, 0);
+      }
+
       updateParent(newBlocks);
       return newBlocks;
     });
@@ -115,6 +147,46 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     setFocusedBlockId(id);
   };
 
+  const handleBlockPaste = (text: string, selectionStart: number, selectionEnd: number, index: number) => {
+    const currentBlock = blocks[index];
+    const beforeCursor = currentBlock.content.substring(0, selectionStart);
+    const afterCursor = currentBlock.content.substring(selectionEnd);
+    
+    // Split pasted text by newlines
+    const lines = text.split(/\r\n|\r|\n/);
+    
+    if (lines.length <= 1) return; // Should not happen based on caller check, but safety first
+
+    const newBlocks: Block[] = [];
+    
+    // 1. Current block becomes the first part
+    newBlocks.push({ ...currentBlock, content: beforeCursor + lines[0] });
+    
+    // 2. Middle lines become new blocks
+    for (let i = 1; i < lines.length - 1; i++) {
+        newBlocks.push({ id: generateId(), content: lines[i], type: 'text' });
+    }
+    
+    // 3. Last part becomes the last block
+    const lastLine = lines[lines.length - 1];
+    const lastBlock: Block = { id: generateId(), content: lastLine + afterCursor, type: 'text' };
+    newBlocks.push(lastBlock);
+    
+    setBlocks(prev => {
+        const updated = [...prev];
+        updated.splice(index, 1, ...newBlocks);
+        updateParent(updated);
+        return updated;
+    });
+
+    // Focus the last created block at the end of the pasted content
+    // setTimeout needed to allow render cycle to create refs
+    setTimeout(() => {
+        setFocusedBlockId(lastBlock.id);
+        setCursorOffset(lastLine.length);
+    }, 0);
+  };
+
   // --- Event Handlers ---
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, id: string) => {
@@ -127,17 +199,13 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       const currentBlock = blocks[index];
       
-      // If we are inside a code block (starts with ```), Enter should insert newline, not split block
-      if (currentBlock.content.trim().startsWith('```') && !currentBlock.content.trim().endsWith('```')) {
-          // It's an open code block, allow default Enter (textarea handles it)
-          return; 
-      }
-      
-      // If the block content is a closed code block, assume user wants to create a new block below
-      if (currentBlock.content.trim().startsWith('```') && (currentBlock.content.match(/```/g) || []).length >= 2) {
-          // Proceed to create new block below
-      } else if (currentBlock.content.trim().startsWith('```')) {
-          // Inside open code block, don't prevent default
+      // If we are inside a code block, EditorBlock handles Enter internally for newlines.
+      // We only reach here if EditorBlock let it bubble (e.g. standard text).
+      // However, for code blocks, EditorBlock now stops propagation for Enter.
+      // Just in case:
+      if (currentBlock.content.trim().startsWith('```')) {
+          // If the block content is a closed code block, and we are at the very end...
+          // Actually, let's rely on EditorBlock stopping propagation.
           return;
       }
 
@@ -191,14 +259,6 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     } 
     // NAVIGATION: Arrows
     else if (e.key === 'ArrowUp' && index > 0) {
-        // Only navigate if we are at the visual top of the block.
-        // For single-line inputs, this is always. For multiline, we'd need cursor position check.
-        // For now, simpler Logic: if it's a short line or explicit navigation desired.
-        // Note: native textarea up/down handles intra-block navigation.
-        
-        // We use a small timeout check or simply rely on textarea "top" logic, 
-        // but since we want block navigation, let's allow it if cursor is at 0? 
-        // Or strictly if it's a single line block to avoid frustration.
         const textarea = e.currentTarget as HTMLTextAreaElement;
         const isFirstLine = textarea.value.substr(0, textarea.selectionStart).split('\n').length === 1;
 
@@ -266,6 +326,7 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
                     onFocus={(e) => handlePreviewClick(e, block.id)}
                     onChange={(val) => updateBlockContent(block.id, val)}
                     onKeyDown={(e) => handleKeyDown(e, index, block.id)}
+                    onPaste={(text, start, end) => handleBlockPaste(text, start, end, index)}
                 />
             )}
         </React.Fragment>
@@ -298,40 +359,119 @@ interface EditorBlockProps {
     onFocus: (e: React.MouseEvent) => void;
     onChange: (val: string) => void;
     onKeyDown: (e: React.KeyboardEvent) => void;
+    onPaste: (text: string, selectionStart: number, selectionEnd: number) => void;
 }
 
-const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOffset, onFocus, onChange, onKeyDown }) => {
+const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOffset, onFocus, onChange, onKeyDown, onPaste }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Ref to track IME composition state locally
     const isComposing = useRef(false);
 
-    // Use useLayoutEffect to prevent cursor jumping
+    // Auto-resize when content changes
     useLayoutEffect(() => {
-        if (isFocused && textareaRef.current) {
-            // Auto-resize
+        if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-            
-            // Focus and set cursor
-            textareaRef.current.focus();
-            
-            if (cursorOffset !== null) {
+        }
+    }, [content]);
+
+    // Focus and Cursor Management
+    useLayoutEffect(() => {
+        if (isFocused && textareaRef.current) {
+             textareaRef.current.focus();
+             if (cursorOffset !== null) {
                 try {
                     textareaRef.current.setSelectionRange(cursorOffset, cursorOffset);
                 } catch (e) {
-                    // Fallback if offset is out of bounds
-                    textareaRef.current.setSelectionRange(content.length, content.length);
+                    console.warn('Cursor offset out of bounds', e);
                 }
-            }
+             }
         }
-    }, [isFocused, cursorOffset]); // Depend on cursorOffset to update when it changes
+    }, [isFocused, cursorOffset]);
 
     const handleKeyDownWrapper = (e: React.KeyboardEvent) => {
         // Prevent triggering parent block navigation/creation if IME is active.
         if (isComposing.current || e.nativeEvent.isComposing) {
             return;
         }
+
+        const isCodeBlock = content.trim().startsWith('```');
+
+        // Logic for Code Block Editing
+        if (isCodeBlock && textareaRef.current) {
+            // TAB: Insert 4 spaces
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                e.stopPropagation(); // Stop propagation
+
+                const textarea = textareaRef.current;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const spaces = "    "; // 4 spaces
+                
+                const newValue = content.substring(0, start) + spaces + content.substring(end);
+                onChange(newValue);
+
+                // Need to restore cursor position after state update
+                setTimeout(() => {
+                    if (textareaRef.current) {
+                        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + spaces.length;
+                    }
+                }, 0);
+                return;
+            }
+
+            // ENTER: Newline + Auto-indent
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Stop propagation so parent doesn't split block
+
+                const textarea = textareaRef.current;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                
+                // Find start of current line to determine indentation
+                const value = textarea.value;
+                const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+                const currentLineToCursor = value.substring(lineStart, start);
+                
+                // Capture leading whitespace
+                const match = currentLineToCursor.match(/^(\s*)/);
+                const indent = match ? match[1] : '';
+                
+                const insertion = '\n' + indent;
+                const newValue = content.substring(0, start) + insertion + content.substring(end);
+                
+                onChange(newValue);
+
+                setTimeout(() => {
+                    if (textareaRef.current) {
+                        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + insertion.length;
+                        // Trigger resize just in case
+                        textareaRef.current.style.height = 'auto';
+                        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+                    }
+                }, 0);
+                return;
+            }
+        }
+
         onKeyDown(e);
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const text = e.clipboardData.getData('text/plain');
+        const isCodeBlock = content.trim().startsWith('```');
+        
+        // If it's a code block, we typically want to paste as is (even multiline), 
+        // the auto-resize in useEffect will handle visibility.
+        // If it's a normal text block and contains newlines, we want to split blocks.
+        if (!isCodeBlock && text.includes('\n')) {
+            e.preventDefault();
+            const textarea = e.currentTarget;
+            onPaste(text, textarea.selectionStart, textarea.selectionEnd);
+        }
+        // Fallback: Default paste behavior happens, onChange triggers, content updates, useEffect resizes.
     };
 
     // Simple markdown syntax highlighter for the textarea input
@@ -353,6 +493,7 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOff
                     value={content}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDownWrapper}
+                    onPaste={handlePaste}
                     onCompositionStart={() => { isComposing.current = true; }}
                     onCompositionEnd={() => { isComposing.current = false; }}
                     className={`w-full resize-none overflow-hidden bg-transparent focus:outline-none placeholder-gray-300 ${getInputStyle(content)}`}
