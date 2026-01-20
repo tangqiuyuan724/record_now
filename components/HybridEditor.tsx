@@ -187,6 +187,43 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
     }, 0);
   };
 
+  const handleImagePaste = async (file: File, cursorOffset: number, index: number) => {
+      try {
+          const base64 = await convertFileToBase64(file);
+          const currentBlock = blocks[index];
+          const before = currentBlock.content.substring(0, cursorOffset);
+          const after = currentBlock.content.substring(cursorOffset);
+
+          const newBlocks: Block[] = [];
+          
+          // 1. Before content (update current block later or push new one)
+          newBlocks.push({ ...currentBlock, content: before });
+          
+          // 2. Image Block
+          newBlocks.push({ id: generateId(), content: `![Image](${base64})`, type: 'text' });
+          
+          // 3. After content
+          const afterBlock: Block = { id: generateId(), content: after, type: 'text' };
+          newBlocks.push(afterBlock);
+
+          setBlocks(prev => {
+              const updated = [...prev];
+              updated.splice(index, 1, ...newBlocks);
+              updateParent(updated);
+              return updated;
+          });
+
+          // Focus on the block AFTER the image
+          setTimeout(() => {
+              setFocusedBlockId(afterBlock.id);
+              setCursorOffset(0);
+          }, 0);
+
+      } catch (err) {
+          console.error("Failed to paste image", err);
+      }
+  };
+
   // --- Event Handlers ---
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, id: string) => {
@@ -327,6 +364,7 @@ const HybridEditor: React.FC<HybridEditorProps> = ({ content, onChange }) => {
                     onChange={(val) => updateBlockContent(block.id, val)}
                     onKeyDown={(e) => handleKeyDown(e, index, block.id)}
                     onPaste={(text, start, end) => handleBlockPaste(text, start, end, index)}
+                    onImagePaste={(file, offset) => handleImagePaste(file, offset, index)}
                 />
             )}
         </React.Fragment>
@@ -360,9 +398,10 @@ interface EditorBlockProps {
     onChange: (val: string) => void;
     onKeyDown: (e: React.KeyboardEvent) => void;
     onPaste: (text: string, selectionStart: number, selectionEnd: number) => void;
+    onImagePaste: (file: File, cursorOffset: number) => void;
 }
 
-const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOffset, onFocus, onChange, onKeyDown, onPaste }) => {
+const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOffset, onFocus, onChange, onKeyDown, onPaste, onImagePaste }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Ref to track IME composition state locally
     const isComposing = useRef(false);
@@ -460,6 +499,19 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOff
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const textarea = e.currentTarget;
+        
+        // 1. Check for Image Files
+        if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+            const file = e.clipboardData.files[0];
+            if (file.type.startsWith('image/')) {
+                e.preventDefault();
+                onImagePaste(file, textarea.selectionStart);
+                return;
+            }
+        }
+
+        // 2. Text Paste Logic
         const text = e.clipboardData.getData('text/plain');
         const isCodeBlock = content.trim().startsWith('```');
         
@@ -468,7 +520,6 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOff
         // If it's a normal text block and contains newlines, we want to split blocks.
         if (!isCodeBlock && text.includes('\n')) {
             e.preventDefault();
-            const textarea = e.currentTarget;
             onPaste(text, textarea.selectionStart, textarea.selectionEnd);
         }
         // Fallback: Default paste behavior happens, onChange triggers, content updates, useEffect resizes.
@@ -507,6 +558,7 @@ const EditorBlock: React.FC<EditorBlockProps> = ({ content, isFocused, cursorOff
                              <ReactMarkdown 
                                 remarkPlugins={[remarkGfm, remarkMath]}
                                 rehypePlugins={[rehypeKatex]}
+                                urlTransform={(url) => url} 
                                 components={{
                                     p: ({node, ...props}) => <p className="mb-1" {...props} />,
                                     img: ({node, ...props}) => <img className="max-h-96 rounded-lg my-2 shadow-sm border border-gray-100" {...props} />,

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,6 +19,7 @@ const Preview: React.FC<PreviewProps> = ({ content, className }) => {
       <ReactMarkdown 
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
+        urlTransform={(url) => url}
         components={{
           code({node, className, children, ...props}: any) {
             const match = /language-(\w+)/.exec(className || '');
